@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 const QUESTIONS = [
   {
@@ -80,6 +81,9 @@ export default function InterviewPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [interviewId, setInterviewId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -91,17 +95,55 @@ export default function InterviewPage() {
     scrollToBottom();
   }, [messages]);
 
+  // Create interview session on mount
   useEffect(() => {
-    // Initial greeting
+    const createInterview = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("interviews")
+          .insert({
+            status: "in_progress",
+            answers: {},
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Failed to create interview:", error);
+          return;
+        }
+
+        if (data) {
+          setInterviewId(data.id);
+          // Store in localStorage for recovery
+          localStorage.setItem("currentInterviewId", data.id);
+        }
+      } catch (err) {
+        console.error("Error creating interview:", err);
+      }
+    };
+
+    // Check for existing interview in progress
+    const existingId = localStorage.getItem("currentInterviewId");
+    if (existingId) {
+      // Could add recovery logic here
+      setInterviewId(existingId);
+    } else {
+      createInterview();
+    }
+  }, []);
+
+  // Initial greeting
+  useEffect(() => {
     const greeting: Message = {
       id: Date.now(),
       type: "bot",
-      content: "안녕하세요! 사업계획서 작성을 도와드릴게요. 🙌\n\n10개의 질문에 답해주시면, 예비창업패키지 양식에 맞는 사업계획서 초안을 만들어 드립니다.\n\n준비되셨으면 시작할게요!",
+      content:
+        "안녕하세요! 사업계획서 작성을 도와드릴게요. 🙌\n\n10개의 질문에 답해주시면, 예비창업패키지 양식에 맞는 사업계획서 초안을 만들어 드립니다.\n\n준비되셨으면 시작할게요!",
       timestamp: new Date(),
     };
     setMessages([greeting]);
 
-    // First question after delay
     setTimeout(() => {
       const firstQuestion: Message = {
         id: Date.now() + 1,
@@ -113,11 +155,39 @@ export default function InterviewPage() {
     }, 1000);
   }, []);
 
-  const handleSubmit = () => {
+  // Save answers to Supabase
+  const saveAnswers = useCallback(
+    async (newAnswers: Record<number, string>, status: "in_progress" | "completed" = "in_progress") => {
+      if (!interviewId) return;
+
+      setIsSaving(true);
+      try {
+        const { error } = await supabase
+          .from("interviews")
+          .update({
+            answers: newAnswers,
+            status,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", interviewId);
+
+        if (error) {
+          console.error("Failed to save answers:", error);
+        }
+      } catch (err) {
+        console.error("Error saving answers:", err);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [interviewId]
+  );
+
+  const handleSubmit = async () => {
     if (!inputValue.trim()) return;
 
     const currentQuestion = QUESTIONS[currentQuestionIndex];
-    
+
     // Add user message
     const userMessage: Message = {
       id: Date.now(),
@@ -128,16 +198,21 @@ export default function InterviewPage() {
     setMessages((prev) => [...prev, userMessage]);
 
     // Save answer
-    setAnswers((prev) => ({
-      ...prev,
+    const newAnswers = {
+      ...answers,
       [currentQuestion.id]: inputValue,
-    }));
+    };
+    setAnswers(newAnswers);
+
+    // Save to Supabase
+    const isLastQuestion = currentQuestionIndex >= QUESTIONS.length - 1;
+    await saveAnswers(newAnswers, isLastQuestion ? "completed" : "in_progress");
 
     setInputValue("");
     setShowHint(false);
 
     // Next question or complete
-    if (currentQuestionIndex < QUESTIONS.length - 1) {
+    if (!isLastQuestion) {
       const nextIndex = currentQuestionIndex + 1;
       setCurrentQuestionIndex(nextIndex);
 
@@ -152,17 +227,35 @@ export default function InterviewPage() {
       }, 500);
     } else {
       // Complete
+      localStorage.removeItem("currentInterviewId");
+      
       setTimeout(() => {
         const completeMessage: Message = {
           id: Date.now() + 1,
           type: "bot",
-          content: "모든 질문에 답해주셨어요! 🎉\n\n이제 AI가 답변을 바탕으로 사업계획서를 작성합니다.\n잠시만 기다려주세요...",
+          content:
+            "모든 질문에 답해주셨어요! 🎉\n\n이제 AI가 답변을 바탕으로 사업계획서를 작성합니다.\n잠시만 기다려주세요...",
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, completeMessage]);
         setIsComplete(true);
       }, 500);
     }
+  };
+
+  const handleGenerateBusinessPlan = async () => {
+    setIsGenerating(true);
+    
+    // TODO: Call Claude API to generate business plan
+    // For now, show a placeholder
+    setTimeout(() => {
+      alert(
+        "사업계획서 생성 기능은 다음 단계에서 구현됩니다!\n\n" +
+        "인터뷰 ID: " + interviewId + "\n" +
+        "저장된 답변 수: " + Object.keys(answers).length
+      );
+      setIsGenerating(false);
+    }, 1500);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -172,7 +265,8 @@ export default function InterviewPage() {
     }
   };
 
-  const progress = ((currentQuestionIndex + (isComplete ? 1 : 0)) / QUESTIONS.length) * 100;
+  const progress =
+    ((currentQuestionIndex + (isComplete ? 1 : 0)) / QUESTIONS.length) * 100;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -183,6 +277,9 @@ export default function InterviewPage() {
             플랜메이트
           </Link>
           <div className="flex items-center gap-4">
+            {isSaving && (
+              <span className="text-xs text-slate-400">저장 중...</span>
+            )}
             <span className="text-sm text-slate-500">
               {currentQuestionIndex + 1} / {QUESTIONS.length}
             </span>
@@ -204,7 +301,9 @@ export default function InterviewPage() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex ${
+                  message.type === "user" ? "justify-end" : "justify-start"
+                }`}
               >
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-3 ${
@@ -237,10 +336,11 @@ export default function InterviewPage() {
             {/* Hint */}
             {showHint && currentQuestionIndex < QUESTIONS.length && (
               <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                💡 <strong>힌트:</strong> {QUESTIONS[currentQuestionIndex].hint}
+                💡 <strong>힌트:</strong>{" "}
+                {QUESTIONS[currentQuestionIndex].hint}
               </div>
             )}
-            
+
             <div className="flex gap-2">
               <button
                 onClick={() => setShowHint(!showHint)}
@@ -254,7 +354,10 @@ export default function InterviewPage() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={QUESTIONS[currentQuestionIndex]?.placeholder || "답변을 입력하세요..."}
+                placeholder={
+                  QUESTIONS[currentQuestionIndex]?.placeholder ||
+                  "답변을 입력하세요..."
+                }
                 rows={2}
                 className="flex-1 resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -275,13 +378,36 @@ export default function InterviewPage() {
         <footer className="bg-white border-t border-slate-200 sticky bottom-0">
           <div className="container mx-auto max-w-2xl px-4 py-6">
             <button
-              onClick={() => {
-                console.log("Answers:", answers);
-                alert("사업계획서 생성 기능은 곧 추가됩니다!\n\n답변이 콘솔에 저장되었습니다.");
-              }}
-              className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700 transition"
+              onClick={handleGenerateBusinessPlan}
+              disabled={isGenerating}
+              className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700 disabled:bg-blue-400 transition flex items-center justify-center gap-2"
             >
-              사업계획서 생성하기 →
+              {isGenerating ? (
+                <>
+                  <svg
+                    className="animate-spin h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  생성 중...
+                </>
+              ) : (
+                "사업계획서 생성하기 →"
+              )}
             </button>
           </div>
         </footer>
