@@ -1,72 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-
-const QUESTIONS = [
-  {
-    id: 1,
-    question: "어떤 문제를 해결하고 싶으세요?",
-    hint: "고객이 겪고 있는 불편함이나 해결되지 않은 니즈를 말해주세요.",
-    placeholder: "예: 프리랜서 예술가들이 세금 신고할 때 뭘 해야 할지 몰라서 어려워해요",
-  },
-  {
-    id: 2,
-    question: "왜 이 문제에 관심을 갖게 됐나요?",
-    hint: "개인적인 경험이나 발견한 계기를 말해주세요.",
-    placeholder: "예: 저도 프리랜서로 일하면서 첫 세금 신고 때 정말 막막했어요",
-  },
-  {
-    id: 3,
-    question: "이 문제를 겪고 있는 사람들은 누구인가요?",
-    hint: "타겟 고객을 구체적으로 설명해주세요. (연령, 직업, 상황 등)",
-    placeholder: "예: 20-30대 프리랜서 예술가, 1인 창작자, 연 수입 5천만원 이하",
-  },
-  {
-    id: 4,
-    question: "지금은 이 문제를 어떻게 해결하고 있나요?",
-    hint: "기존 해결책이나 경쟁 서비스를 말해주세요.",
-    placeholder: "예: 블로그 검색하거나, 지인한테 물어보거나, 세무사 찾아가요",
-  },
-  {
-    id: 5,
-    question: "당신의 해결책은 무엇인가요?",
-    hint: "만들고자 하는 제품/서비스를 설명해주세요.",
-    placeholder: "예: 개인화된 세금 일정 알림과 단계별 가이드 템플릿을 제공하는 플랫폼",
-  },
-  {
-    id: 6,
-    question: "기존 해결책과 뭐가 다른가요?",
-    hint: "차별점, 경쟁 우위를 말해주세요.",
-    placeholder: "예: 예술인 특화, 개인 상황에 맞는 알림, 복잡한 내용을 쉬운 템플릿으로",
-  },
-  {
-    id: 7,
-    question: "어떻게 돈을 벌 계획인가요?",
-    hint: "수익 모델을 설명해주세요. (구독, 건당 결제, 광고 등)",
-    placeholder: "예: 월 9,900원 구독제, 기본 무료 + 프리미엄 기능 유료",
-  },
-  {
-    id: 8,
-    question: "첫 고객은 어떻게 모을 계획인가요?",
-    hint: "초기 마케팅/영업 전략을 말해주세요.",
-    placeholder: "예: 예술인 커뮤니티, 인스타그램 타겟 광고, 지인 네트워크",
-  },
-  {
-    id: 9,
-    question: "왜 당신이 이 문제를 해결해야 하나요?",
-    hint: "팀 역량, 관련 경험, 도메인 지식 등을 말해주세요.",
-    placeholder: "예: 5년간 프리랜서 활동, 개발자 경력 3년, 세무 관련 스터디 운영",
-  },
-  {
-    id: 10,
-    question: "1년 후 목표는 무엇인가요?",
-    hint: "구체적인 숫자가 있으면 좋아요. (사용자 수, 매출 등)",
-    placeholder: "예: MAU 1만명, 유료 구독자 500명, 월 매출 500만원",
-  },
-];
+import { getTemplateById, TEMPLATES } from "@/lib/templates";
 
 interface Message {
   id: number;
@@ -75,8 +13,12 @@ interface Message {
   timestamp: Date;
 }
 
-export default function InterviewPage() {
+function InterviewContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const templateId = searchParams.get("template") || "startup-preliminary";
+  const template = getTemplateById(templateId) || TEMPLATES[0];
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [inputValue, setInputValue] = useState("");
@@ -106,6 +48,7 @@ export default function InterviewPage() {
           .insert({
             status: "in_progress",
             answers: {},
+            template_id: templateId,
           })
           .select()
           .single();
@@ -117,7 +60,6 @@ export default function InterviewPage() {
 
         if (data) {
           setInterviewId(data.id);
-          // Store in localStorage for recovery
           localStorage.setItem("currentInterviewId", data.id);
         }
       } catch (err) {
@@ -125,23 +67,15 @@ export default function InterviewPage() {
       }
     };
 
-    // Check for existing interview in progress
-    const existingId = localStorage.getItem("currentInterviewId");
-    if (existingId) {
-      // Could add recovery logic here
-      setInterviewId(existingId);
-    } else {
-      createInterview();
-    }
-  }, []);
+    createInterview();
+  }, [templateId]);
 
   // Initial greeting
   useEffect(() => {
     const greeting: Message = {
       id: Date.now(),
       type: "bot",
-      content:
-        "안녕하세요! 사업계획서 작성을 도와드릴게요. 🙌\n\n10개의 질문에 답해주시면, 예비창업패키지 양식에 맞는 사업계획서 초안을 만들어 드립니다.\n\n준비되셨으면 시작할게요!",
+      content: `안녕하세요! **${template.name}** 사업계획서 작성을 도와드릴게요. 🙌\n\n${template.questions.length}개의 질문에 답해주시면, 양식에 맞는 사업계획서 초안을 만들어 드립니다.\n\n준비되셨으면 시작할게요!`,
       timestamp: new Date(),
     };
     setMessages([greeting]);
@@ -150,12 +84,12 @@ export default function InterviewPage() {
       const firstQuestion: Message = {
         id: Date.now() + 1,
         type: "bot",
-        content: `**질문 1/10**\n\n${QUESTIONS[0].question}`,
+        content: `**질문 1/${template.questions.length}**\n\n${template.questions[0].question}`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, firstQuestion]);
     }, 1000);
-  }, []);
+  }, [template]);
 
   // Save answers to Supabase
   const saveAnswers = useCallback(
@@ -188,7 +122,7 @@ export default function InterviewPage() {
   const handleSubmit = async () => {
     if (!inputValue.trim()) return;
 
-    const currentQuestion = QUESTIONS[currentQuestionIndex];
+    const currentQuestion = template.questions[currentQuestionIndex];
 
     // Add user message
     const userMessage: Message = {
@@ -207,7 +141,7 @@ export default function InterviewPage() {
     setAnswers(newAnswers);
 
     // Save to Supabase
-    const isLastQuestion = currentQuestionIndex >= QUESTIONS.length - 1;
+    const isLastQuestion = currentQuestionIndex >= template.questions.length - 1;
     await saveAnswers(newAnswers, isLastQuestion ? "completed" : "in_progress");
 
     setInputValue("");
@@ -222,7 +156,7 @@ export default function InterviewPage() {
         const nextQuestion: Message = {
           id: Date.now() + 1,
           type: "bot",
-          content: `**질문 ${nextIndex + 1}/10**\n\n${QUESTIONS[nextIndex].question}`,
+          content: `**질문 ${nextIndex + 1}/${template.questions.length}**\n\n${template.questions[nextIndex].question}`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, nextQuestion]);
@@ -257,6 +191,7 @@ export default function InterviewPage() {
         body: JSON.stringify({
           interviewId,
           answers,
+          templateId,
         }),
       });
 
@@ -283,22 +218,26 @@ export default function InterviewPage() {
   };
 
   const progress =
-    ((currentQuestionIndex + (isComplete ? 1 : 0)) / QUESTIONS.length) * 100;
+    ((currentQuestionIndex + (isComplete ? 1 : 0)) / template.questions.length) * 100;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-slate-800">
-            플랜메이트
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-xl font-bold text-slate-800">
+              플랜메이트
+            </Link>
+            <span className="text-sm text-slate-400">|</span>
+            <span className="text-sm text-slate-600">{template.icon} {template.name}</span>
+          </div>
           <div className="flex items-center gap-4">
             {isSaving && (
               <span className="text-xs text-slate-400">저장 중...</span>
             )}
             <span className="text-sm text-slate-500">
-              {currentQuestionIndex + 1} / {QUESTIONS.length}
+              {currentQuestionIndex + 1} / {template.questions.length}
             </span>
           </div>
         </div>
@@ -351,10 +290,10 @@ export default function InterviewPage() {
         <footer className="bg-white border-t border-slate-200 sticky bottom-0">
           <div className="container mx-auto max-w-2xl px-4 py-4">
             {/* Hint */}
-            {showHint && currentQuestionIndex < QUESTIONS.length && (
+            {showHint && currentQuestionIndex < template.questions.length && (
               <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
                 💡 <strong>힌트:</strong>{" "}
-                {QUESTIONS[currentQuestionIndex].hint}
+                {template.questions[currentQuestionIndex].hint}
               </div>
             )}
 
@@ -372,7 +311,7 @@ export default function InterviewPage() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  QUESTIONS[currentQuestionIndex]?.placeholder ||
+                  template.questions[currentQuestionIndex]?.placeholder ||
                   "답변을 입력하세요..."
                 }
                 rows={2}
@@ -430,5 +369,17 @@ export default function InterviewPage() {
         </footer>
       )}
     </div>
+  );
+}
+
+export default function InterviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <InterviewContent />
+    </Suspense>
   );
 }
