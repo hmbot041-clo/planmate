@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const QUESTIONS = [
@@ -75,6 +76,7 @@ interface Message {
 }
 
 export default function InterviewPage() {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [inputValue, setInputValue] = useState("");
@@ -246,16 +248,31 @@ export default function InterviewPage() {
   const handleGenerateBusinessPlan = async () => {
     setIsGenerating(true);
     
-    // TODO: Call Claude API to generate business plan
-    // For now, show a placeholder
-    setTimeout(() => {
-      alert(
-        "사업계획서 생성 기능은 다음 단계에서 구현됩니다!\n\n" +
-        "인터뷰 ID: " + interviewId + "\n" +
-        "저장된 답변 수: " + Object.keys(answers).length
-      );
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          interviewId,
+          answers,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "생성 중 오류가 발생했습니다.");
+      }
+
+      // Redirect to result page
+      router.push(`/result/${interviewId}`);
+    } catch (error) {
+      console.error("Error generating business plan:", error);
+      alert("사업계획서 생성 중 오류가 발생했습니다. 다시 시도해주세요.");
       setIsGenerating(false);
-    }, 1500);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
