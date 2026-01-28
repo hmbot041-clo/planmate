@@ -1,7 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Using 'any' for MVP speed - can add proper types later
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Interview type for reference
+export interface Interview {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  status: 'in_progress' | 'completed';
+  answers: Record<number, string>;
+  business_plan: string | null;
+  email: string | null;
+}
