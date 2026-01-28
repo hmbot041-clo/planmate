@@ -27,7 +27,7 @@ export default function Home() {
           예비창업패키지 양식에 맞는 사업계획서가 자동으로 만들어집니다.
         </p>
         <Link
-          href="#pricing"
+          href="/interview"
           className="inline-block bg-blue-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-600/30"
         >
           무료로 시작하기 →
@@ -207,9 +207,9 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <button className="w-full bg-blue-600 text-white py-4 rounded-full font-semibold text-lg hover:bg-blue-700 transition">
+            <Link href="/interview" className="block w-full bg-blue-600 text-white py-4 rounded-full font-semibold text-lg hover:bg-blue-700 transition text-center">
               지금 시작하기 →
-            </button>
+            </Link>
             <p className="text-center text-sm text-slate-500 mt-4">
               * 첫 3개 질문은 무료로 체험 가능<br />
               * 마음에 안 들면 100% 환불
@@ -249,9 +249,9 @@ export default function Home() {
           <p className="text-xl text-slate-600 mb-8">
             지금 시작하면 오늘 초안을 손에 쥘 수 있습니다.
           </p>
-          <button className="bg-blue-600 text-white px-10 py-4 rounded-full text-lg font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-600/30">
+          <Link href="/interview" className="inline-block bg-blue-600 text-white px-10 py-4 rounded-full text-lg font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-600/30">
             무료로 시작하기 →
-          </button>
+          </Link>
           <p className="mt-4 text-sm text-slate-500">
             가입 후 바로 시작 • 카드 등록 없음 • 첫 3개 질문 무료
           </p>
