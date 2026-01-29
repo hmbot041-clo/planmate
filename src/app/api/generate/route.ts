@@ -1,7 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { getTemplateById, TEMPLATES } from "@/lib/templates";
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
       message.content[0].type === "text" ? message.content[0].text : "";
 
     // Save to Supabase
-    if (interviewId) {
+    if (interviewId && isSupabaseConfigured()) {
       await supabase
         .from("interviews")
         .update({
