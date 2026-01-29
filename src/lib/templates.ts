@@ -475,9 +475,7 @@ export const TEMPLATES: Template[] = [
 ### 9.1 협약기간 내 목표
 ### 9.2 단계별 계획`,
   },
-];
-
-{
+  {
     id: "startup-official",
     name: "창업사업화 지원사업 (공식양식)",
     description: "창업진흥원 공식 사업계획서 양식 기준",
