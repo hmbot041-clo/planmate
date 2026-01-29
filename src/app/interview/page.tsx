@@ -201,6 +201,11 @@ function InterviewContent() {
         throw new Error(data.error || "생성 중 오류가 발생했습니다.");
       }
 
+      // Store business plan in sessionStorage for immediate display
+      if (data.businessPlan) {
+        sessionStorage.setItem(`businessPlan_${interviewId}`, data.businessPlan);
+      }
+
       // Redirect to result page
       router.push(`/result/${interviewId}`);
     } catch (error) {

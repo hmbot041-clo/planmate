@@ -15,6 +15,26 @@ export default function ResultPage() {
   useEffect(() => {
     const fetchInterview = async () => {
       try {
+        // First check sessionStorage for immediate display
+        const cachedPlan = sessionStorage.getItem(`businessPlan_${params.id}`);
+        
+        if (cachedPlan) {
+          setInterview({
+            id: params.id as string,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            status: 'completed',
+            answers: {},
+            business_plan: cachedPlan,
+            email: null,
+          });
+          setLoading(false);
+          // Clean up sessionStorage
+          sessionStorage.removeItem(`businessPlan_${params.id}`);
+          return;
+        }
+
+        // Fall back to Supabase
         const { data, error } = await supabase
           .from("interviews")
           .select("*")
