@@ -48,7 +48,6 @@ function InterviewContent() {
           .insert({
             status: "in_progress",
             answers: {},
-            template_id: templateId,
           })
           .select()
           .single();
